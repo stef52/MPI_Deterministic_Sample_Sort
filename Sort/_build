@@ -1,0 +1,5 @@
+#!/bin/sh
+
+mpiCC main.cpp -o main  #<-- edit file name
+
+

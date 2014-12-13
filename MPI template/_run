@@ -1,0 +1,5 @@
+#!/bin/sh
+
+mpiexec -n 4 main   #<-- edit file name and number of processors (currently 4)
+
+
