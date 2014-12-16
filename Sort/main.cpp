@@ -163,19 +163,19 @@ static void fix(int v[], int m, int n)
 void sort(int data[], int n)
 {
 	int myid, prosCount, resultSize,i, j, buf, tmp, l, r, L, R;
-	int *scounts, *rcounts, *sdispl, *rdispl, *bloc, *bsize, *counts, 
-	*send, *receive, *result, *splits, *allSplits;
+	int *scounts, *displs, *sdispl, *recvtype, *bloc, *bsize, *counts, 
+	*send, *receive, *result, *sendBuf, *recvcounts;
 
 	MPI_Comm_size(MPI_COMM_WORLD, &prosCount);
 	MPI_Comm_rank(MPI_COMM_WORLD, &myid);
 
 	result      = MakeArray((2 * n));
-	splits    	= MakeArray(prosCount);
-	allSplits 	= MakeArray((prosCount * prosCount));
+	sendBuf    	= MakeArray(prosCount);
+	recvcounts 	= MakeArray((prosCount * prosCount));
 	scounts     = (int *) malloc(prosCount*sizeof(int)+1);
-	rcounts     = (int *) malloc(prosCount*sizeof(int)+1);
+	displs      = (int *) malloc(prosCount*sizeof(int)+1);
 	sdispl      = (int *) malloc(prosCount*sizeof(int)+1);
-	rdispl      = (int *) malloc(prosCount*sizeof(int)+1);
+	recvtype    = (int *) malloc(prosCount*sizeof(int)+1);
 	counts      = (int *) malloc(prosCount*sizeof(int)+1);
 	send        = (int *) malloc(prosCount*sizeof(int)+1);
 	receive     = (int *) malloc(prosCount*sizeof(int)+1);
@@ -185,30 +185,30 @@ void sort(int data[], int n)
 	heapsort(data, n);
 
 	for (i=0; i<prosCount; i++) {
-		splits[i] = data[i * n / prosCount];
-		rdispl[i] = i * prosCount;
-		rcounts[i] = prosCount;
+		sendBuf[i] = data[i * n / prosCount];
+		recvtype[i] = i * prosCount;
+		displs[i] = prosCount;
 	}
 
-	MPI_Gatherv(splits, prosCount, MPI_Type, allSplits, rcounts,
-	      rdispl, MPI_INT, 0, MPI_COMM_WORLD);
+	MPI_Gatherv(sendBuf, prosCount, MPI_Type, recvcounts, displs,
+	      recvtype, MPI_INT, 0, MPI_COMM_WORLD);
 
 	if (myid == 0)
     {
-		heapsort(allSplits, prosCount * prosCount);
+		heapsort(recvcounts, prosCount * prosCount);
 		for (i=0; i<prosCount; i++) 
 		{
-			splits[i] = allSplits[i * prosCount];
+			sendBuf[i] = recvcounts[i * prosCount];
 		}
     }
 
-	MPI_Bcast(splits, prosCount, MPI_Type, 0, MPI_COMM_WORLD);
+	MPI_Bcast(sendBuf, prosCount, MPI_Type, 0, MPI_COMM_WORLD);
 
 	j=0;
 	bloc[0] = 0;
 	for (i=1; i<prosCount; i++)
     {
-		while (Smaller(data[j],splits[i])) {
+		while (Smaller(data[j],sendBuf[i])) {
 			j++;
 		}
 		bloc[i]=j;
@@ -225,36 +225,36 @@ void sort(int data[], int n)
     {
       scounts[i] 	= 1;
       sdispl[i] 	= i;
-      rcounts[i] 	= 1;
-      rdispl[i] 	= i;
+      displs[i] 	= 1;
+      recvtype[i] 	= i;
     }
     
-	MPI_Alltoallv(bsize, scounts, sdispl, MPI_INT, counts, rcounts,
-		rdispl,  MPI_Type, MPI_COMM_WORLD);
+	MPI_Alltoallv(bsize, scounts, sdispl, MPI_INT, counts, displs,
+		recvtype,  MPI_Type, MPI_COMM_WORLD);
 
 	resultSize = 1;
 	for (i=0; i<prosCount; i++)
     {
       scounts[i] 	= bsize[i];
       sdispl[i] 	=  bloc[i];
-      rcounts[i] 	= counts[i];
-      rdispl[i] 	= resultSize-1; 
+      displs[i] 	= counts[i];
+      recvtype[i] 	= resultSize-1; 
       resultSize 	+= counts[i];
     }
 	resultSize--;
 
-	MPI_Alltoallv(data, scounts, sdispl, MPI_Type, result, rcounts,
-		rdispl,  MPI_Type, MPI_COMM_WORLD);
+	MPI_Alltoallv(data, scounts, sdispl, MPI_Type, result, displs,
+		recvtype,  MPI_Type, MPI_COMM_WORLD);
 
 	heapsort(result, resultSize);
 
 	for (i=0; i<prosCount; i++)
 	{
-		rcounts[i] = 1;
-		rdispl[i]  = i;
+		displs[i] = 1;
+		recvtype[i]  = i;
 	}
 
-	MPI_Allgatherv(&resultSize, 1, MPI_INT, counts, rcounts, rdispl,
+	MPI_Allgatherv(&resultSize, 1, MPI_INT, counts, displs, recvtype,
 		 MPI_INT, MPI_COMM_WORLD);
 
 	L=0;
@@ -278,11 +278,11 @@ void sort(int data[], int n)
 	{
 		scounts[i] 	= 1;
 		sdispl[i] 	= i;
-		rcounts[i] 	= 1;
-		rdispl[i] 	= i;
+		displs[i] 	= 1;
+		recvtype[i] 	= i;
 	}
-	MPI_Alltoallv(send, scounts, sdispl, MPI_INT, receive, rcounts,
-		rdispl,  MPI_Type, MPI_COMM_WORLD);
+	MPI_Alltoallv(send, scounts, sdispl, MPI_INT, receive, displs,
+		recvtype,  MPI_Type, MPI_COMM_WORLD);
 
 	l = 0;
 	r = 0;
@@ -290,21 +290,21 @@ void sort(int data[], int n)
     {
 		scounts[i] = send[i];
 		sdispl[i] =  l; l += scounts[i];
-		rcounts[i] = receive[i];
-		rdispl[i] = r; r += rcounts[i];
+		displs[i] = receive[i];
+		recvtype[i] = r; r += displs[i];
     }
 
-	MPI_Alltoallv(result, scounts, sdispl, MPI_Type, data, rcounts,
-		rdispl,  MPI_Type, MPI_COMM_WORLD);
+	MPI_Alltoallv(result, scounts, sdispl, MPI_Type, data, displs,
+		recvtype,  MPI_Type, MPI_COMM_WORLD);
 
 //free all the tihngs
 	free(result);
-	free(splits);
-	free(allSplits);
+	free(sendBuf);
+	free(recvcounts);
 	free(scounts);
-	free(rcounts);
+	free(displs);
 	free(sdispl);
-	free(rdispl);
+	free(recvtype);
 	free(counts);
 	free(send);
 	free(receive);
