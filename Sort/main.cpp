@@ -8,19 +8,17 @@
 
 #define InputFilePrefix "./inputFiles/"      //input file location 
 #define OutputFilePrefix "./outputFiles/"    //output file location
-#define ArrayData int
 #define MPI_Type  MPI_INT
 #define Smaller(x, y) ((x) < (y))
-#define SWAP(x, y) (temp = (x), (x) = (y), (y) = temp)
 
-ArrayData *MakeArray(int n)
+int *MakeArray(int n)
 {
-	return((ArrayData *) malloc(n*sizeof(ArrayData)+1));
+	return((int *) malloc(n*sizeof(int)+1));
 }
 
-static void fix(ArrayData v[], register int m, register int n);
-void heapsort(ArrayData v[], int n);
-void sort(ArrayData data[], int localSize);
+static void fix(int v[], register int m, register int n);
+void heapsort(int v[], int n);
+void sort(int data[], int localSize);
 
 int main(int argc,char *argv[])
 {
@@ -29,9 +27,9 @@ int main(int argc,char *argv[])
 	char infilepostfix[7], outfilepostfix[8];
 	char infilename[100] = InputFilePrefix;
 	char outfilename[100] = OutputFilePrefix;
-	ArrayData *data;    // input data 
+	int *data;    // input data 
 	int n;     		  	// input size 
-	int p;     		// input proc 
+	int p;     			// input proc 
 
 	int buf, tmp, i, startTotal, stopTotal;
 
@@ -61,7 +59,7 @@ int main(int argc,char *argv[])
 	if (infile == NULL) 
 	{
 		printf("can't open infile(s) \n");
-		 exit(0);
+		exit(0);
 	}
 	  
 	fscanf(infile, "%d\n", &n);
@@ -100,7 +98,7 @@ int main(int argc,char *argv[])
   
 	strcat(outfilename, outfilepostfix);
 	outfile = fopen(outfilename, "w");
-	fprintf(outfile,"proc. %d: \n n = %d \n p = %d \n ", myid, n, p);
+	fprintf(outfile,"proc. %d: \n n = %d \n p = %d \n", myid, n, p);
 	 
 	for (i=0; i<n; i++) 
 	{
@@ -121,27 +119,29 @@ int main(int argc,char *argv[])
 }
 
 // sort into increasing order
-// logic from Stack Overflow
+// heapsort logic from Stack Overflow
 // https://stackoverflow.com/questions/7520133/heap-sort-in-c
-void heapsort(ArrayData v[], int n)
+void heapsort(int v[], int n)
 {
 	int j, temp;
-	ArrayData *b;
+	int *b;
 	b = v - 1;
 	// put array into heap form
 	for (j = n/2; j > 0; j--)
 		fix(v, j, n);
 	for (j = n-1; j > 0; j--)
 	{
-	  SWAP(b[1], b[j+1]);
+	  temp = b[1];
+	  b[1]=b[j+1];
+	  b[j+1]=temp;
 	  fix(v, 1, j);
 	}
 }
 
-static void fix(ArrayData v[], int m, int n)
+static void fix(int v[], int m, int n)
 {
 	int j, k, temp;
-	ArrayData *b;
+	int *b;
 	//origin is 1
 	b = v - 1;  
 	j = m;
@@ -149,20 +149,22 @@ static void fix(ArrayData v[], int m, int n)
 	while (k <= n)
 	{
 		if (k < n && Smaller(b[k],b[k+1])) ++k;
-		if (Smaller(b[j],b[k]))  SWAP(b[j], b[k]);
+		if (Smaller(b[j],b[k]))
+		{
+			temp = b[j];
+			b[j]=b[k];
+			b[k]=temp;
+		}
 		j = k;
 		k *= 2;
 	}
 }
 
-void sort(ArrayData data[], int n)
+void sort(int data[], int n)
 {
-	int myid, prosCount;
-	ArrayData *result;               
-	int resultSize;               
-	ArrayData *splits, *allSplits;
-	int i, j, buf, tmp, l, r, L, R;
-	int *scounts, *rcounts, *sdispl, *rdispl, *bloc, *bsize, *counts, *send, *receive;
+	int myid, prosCount, resultSize,i, j, buf, tmp, l, r, L, R;
+	int *scounts, *rcounts, *sdispl, *rdispl, *bloc, *bsize, *counts, 
+	*send, *receive, *result, *splits, *allSplits;
 
 	MPI_Comm_size(MPI_COMM_WORLD, &prosCount);
 	MPI_Comm_rank(MPI_COMM_WORLD, &myid);
@@ -295,6 +297,7 @@ void sort(ArrayData data[], int n)
 	MPI_Alltoallv(result, scounts, sdispl, MPI_Type, data, rcounts,
 		rdispl,  MPI_Type, MPI_COMM_WORLD);
 
+//free all the tihngs
 	free(result);
 	free(splits);
 	free(allSplits);
