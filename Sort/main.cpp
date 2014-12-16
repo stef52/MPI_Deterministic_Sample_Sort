@@ -8,13 +8,11 @@
 
 #define InputFilePrefix "./inputFiles/"      //input file location 
 #define OutputFilePrefix "./outputFiles/"    //output file location
-#define ROOT 0
 #define ArrayData int
 #define MPI_Type  MPI_INT
 #define Smaller(x, y) ((x) < (y))
 #define SWAP(x, y) (temp = (x), (x) = (y), (y) = temp)
 
-// create an Array of n elements
 ArrayData *MakeArray(int n)
 {
    return((ArrayData *) malloc(n*sizeof(ArrayData)+1));
@@ -53,7 +51,7 @@ void heapsort(ArrayData v[], int n)
 	}
 }
 
-void sort(ArrayData data[], int localSize, int numprocs)
+void sort(ArrayData data[], int n, int prosCount)
 {
   int myid;
   ArrayData *result;               
@@ -64,44 +62,44 @@ void sort(ArrayData data[], int localSize, int numprocs)
       *rdispl, *bloc, *bsize, *counts, 
       *send, *receive;
 
-  //MPI_Comm_size(MPI_COMM_WORLD, &numprocs);
+  MPI_Comm_size(MPI_COMM_WORLD, &prosCount);
   MPI_Comm_rank(MPI_COMM_WORLD, &myid);
 
-  result       = MakeArray((2 * localSize));
-  splitters    = MakeArray(numprocs);
-  allSplitters = MakeArray((numprocs * numprocs));
-  scounts      = (int *) malloc(numprocs*sizeof(int)+1);
-  rcounts      = (int *) malloc(numprocs*sizeof(int)+1);
-  sdispl       = (int *) malloc(numprocs*sizeof(int)+1);
-  rdispl       = (int *) malloc(numprocs*sizeof(int)+1);
-  counts       = (int *) malloc(numprocs*sizeof(int)+1);
-  send         = (int *) malloc(numprocs*sizeof(int)+1);
-  receive      = (int *) malloc(numprocs*sizeof(int)+1);
-  bloc         = (int *) malloc(numprocs*sizeof(int)+1); 
-  bsize        = (int *) malloc(numprocs*sizeof(int)+1); 
+  result       = MakeArray((2 * n));
+  splitters    = MakeArray(prosCount);
+  allSplitters = MakeArray((prosCount * prosCount));
+  scounts      = (int *) malloc(prosCount*sizeof(int)+1);
+  rcounts      = (int *) malloc(prosCount*sizeof(int)+1);
+  sdispl       = (int *) malloc(prosCount*sizeof(int)+1);
+  rdispl       = (int *) malloc(prosCount*sizeof(int)+1);
+  counts       = (int *) malloc(prosCount*sizeof(int)+1);
+  send         = (int *) malloc(prosCount*sizeof(int)+1);
+  receive      = (int *) malloc(prosCount*sizeof(int)+1);
+  bloc         = (int *) malloc(prosCount*sizeof(int)+1); 
+  bsize        = (int *) malloc(prosCount*sizeof(int)+1); 
 
   /* ----------------------- compute splitters ----------*/
-  heapsort(data, localSize);
+  heapsort(data, n);
 
-  for (i=0; i<numprocs; i++) {splitters[i] = data[i * localSize / numprocs];};
-  for (i=0; i<numprocs; i++) {rdispl[i] = i * numprocs;};
-  for (i=0; i<numprocs; i++) {rcounts[i] = numprocs;};
+  for (i=0; i<prosCount; i++) {splitters[i] = data[i * n / prosCount];};
+  for (i=0; i<prosCount; i++) {rdispl[i] = i * prosCount;};
+  for (i=0; i<prosCount; i++) {rcounts[i] = prosCount;};
 
-  MPI_Gatherv(splitters, numprocs, MPI_Type, allSplitters, rcounts,
+  MPI_Gatherv(splitters, prosCount, MPI_Type, allSplitters, rcounts,
 	      rdispl, MPI_INT, 0, MPI_COMM_WORLD);
 
   if (myid == 0)
     {
-      heapsort(allSplitters, numprocs * numprocs);
-      for (i=0; i<numprocs; i++) {splitters[i] = allSplitters[i * numprocs];};
+      heapsort(allSplitters, prosCount * prosCount);
+      for (i=0; i<prosCount; i++) {splitters[i] = allSplitters[i * prosCount];};
     };
 
-  MPI_Bcast(splitters, numprocs, MPI_Type, 0, MPI_COMM_WORLD);
+  MPI_Bcast(splitters, prosCount, MPI_Type, 0, MPI_COMM_WORLD);
 
   /* ---- locate splitters in sorted local data ----------*/
   j=0;
   bloc[0] = 0;
-  for (i=1; i<numprocs; i++)
+  for (i=1; i<prosCount; i++)
     {
       while (Smaller(data[j],splitters[i])) {j++;};
       bloc[i]=j;
@@ -109,14 +107,14 @@ void sort(ArrayData data[], int localSize, int numprocs)
   
 
   /* ---- compute #el. in each sub-bucket ----------*/
-  for (i=0; i<numprocs-1; i++)
+  for (i=0; i<prosCount-1; i++)
     {
       bsize[i] = bloc[i+1]-bloc[i];
     }
-  bsize[numprocs-1] = localSize - bloc[numprocs-1];
+  bsize[prosCount-1] = n - bloc[prosCount-1];
 
   /* ----- communicate bucket sizes ---------------*/
-  for (i=0; i<numprocs; i++)
+  for (i=0; i<prosCount; i++)
     {
       scounts[i] = 1;
       sdispl[i] = i;
@@ -128,7 +126,7 @@ void sort(ArrayData data[], int localSize, int numprocs)
 
   /* ----- send buckets to destination proc. ---------------*/
   resultSize = 1;
-  for (i=0; i<numprocs; i++)
+  for (i=0; i<prosCount; i++)
     {
       scounts[i] = bsize[i];
       sdispl[i] =  bloc[i];
@@ -147,7 +145,7 @@ void sort(ArrayData data[], int localSize, int numprocs)
   /* ----- balance data  ------------------------------------------*/
 
   /* compute array 'counts' with number of data items at each proc.*/
-  for (i=0; i<numprocs; i++)
+  for (i=0; i<prosCount; i++)
   {
       rcounts[i] = 1;
       rdispl[i] = i;
@@ -161,10 +159,10 @@ void sort(ArrayData data[], int localSize, int numprocs)
   for (i=0; i<myid; i++){L += counts[i];};
   R = L + counts[myid] - 1;
 
-  for (i=0; i<numprocs; i++)
+  for (i=0; i<prosCount; i++)
   {
-      l = i * localSize;
-      r = ((i+1) * localSize) - 1;
+      l = i * n;
+      r = ((i+1) * n) - 1;
       send[i] = 0;
       /*-- L l R r ---*/
       if ((L <= l) && (l <= R) && (R <= r)) send[i] = R-l+1;
@@ -177,7 +175,7 @@ void sort(ArrayData data[], int localSize, int numprocs)
   };
 
   /* compute array 'receive' with number data items to be received each proc.*/
-  for (i=0; i<numprocs; i++)
+  for (i=0; i<prosCount; i++)
   {
       scounts[i] = 1;
       sdispl[i] = i;
@@ -191,7 +189,7 @@ void sort(ArrayData data[], int localSize, int numprocs)
 
   l = 0;
   r = 0;
-  for (i=0; i<numprocs; i++)
+  for (i=0; i<prosCount; i++)
     {
       scounts[i] = send[i];
       sdispl[i] =  l; l += scounts[i];
@@ -217,69 +215,28 @@ void sort(ArrayData data[], int localSize, int numprocs)
   free(bsize);
 
 };
-/* ============================================================== */
-/* END SORT                                                       */
-/* ============================================================== */
-
-
-/*******************************************************************
- *                                                                 *
- *  Calculate and print elapsed time                               *
- *                                                                 *
- *******************************************************************/
-
-void printElapsed( char *identString, int myid, int start, int end )
-{
-  int localelapsedTime, globalelapsedTime;
-
-  localelapsedTime = end - start;
-  MPI_Reduce(&localelapsedTime, &globalelapsedTime, 1, MPI_INT,
-	     MPI_MAX, ROOT, MPI_COMM_WORLD);
-
-//  printf("Node %d finished '%s' step: %d sec. elapsed.\n", 
-//        myid, identString, localelapsedTime);
-  if (myid == ROOT)
-    {
-      printf("Maximum time for '%s' step was: %-d sec. elapsed.\n",
-	     identString, globalelapsedTime);
-    }
-  MPI_Reduce(&localelapsedTime, &globalelapsedTime, 1, MPI_INT,
-	     MPI_MIN, ROOT, MPI_COMM_WORLD);
-
-//  printf("Node %d finished '%s' step: %d sec. elapsed.\n", 
-//        myid, identString, localelapsedTime);
-  if (myid == ROOT)
-    {
-      printf("Minimum time for '%s' step was: %-d sec. elapsed.\n",
-	     identString, globalelapsedTime);
-    }
-}
-
-/* ------------- Main ------------------------------------------- */
 
 int main(int argc,char *argv[])
 {
-  int myid, numprocs;
+  int myid, prosCount;
   FILE *infile, *outfile;
   char infilepostfix[7], outfilepostfix[8];
   char infilename[100] = InputFilePrefix;
   char outfilename[100] = OutputFilePrefix;
-  ArrayData *data;   /* input data */
-  int localSize;     /* input size */
-  int psize;     /* input size */
+  ArrayData *data;    // input data 
+  int n;     // input size 
+  int psize;     	// input proc 
 
   int buf, tmp, i, 
       start, stop, startTotal, stopTotal,
-      startOutput, endOutput,
       localelapsedTime, globalelapsedTime;
 
   MPI_Init(&argc, &argv);
 
   startTotal = MPI_Wtime();
-  MPI_Comm_size(MPI_COMM_WORLD, &numprocs);
+  MPI_Comm_size(MPI_COMM_WORLD, &prosCount);
   MPI_Comm_rank(MPI_COMM_WORLD, &myid);
 
-  /* ---- read ArraySize and array 'data' from infile ---- */
   infilepostfix[0] = 'i';
   infilepostfix[1] = 'n';
   infilepostfix[2] = 'p';
@@ -293,23 +250,38 @@ int main(int argc,char *argv[])
   infilepostfix[10] = 'x';
   infilepostfix[11] = 't';
   infilepostfix[12] = '\0';
+  
   strcat(infilename, infilepostfix);
   infile = fopen(infilename, "r");
-  if (infile == NULL) {printf("can't open infile %s \n", infilename);exit(0);};
-  fscanf(infile, "%d\n", &localSize);
+  
+  if (infile == NULL) 
+  {
+	  printf("can't open infile(s) \n");
+	  exit(0);
+  }
+  
+  fscanf(infile, "%d\n", &n);
   fscanf(infile, "%d\n", &psize);
-  localSize = localSize/psize;
-  data = MakeArray(localSize);
-  for (i=0; i<localSize; i++) {fscanf(infile, "%d", &buf); data[i]=buf;};
+  n = n/psize; //  n/p
+  data = MakeArray(n);
+  
+  for (i=0; i<n; i++) 
+  {
+	  fscanf(infile, "%d", &buf); 
+	  data[i]=buf;
+  }
+  
   tmp = fclose(infile);
-  if (tmp != 0) {printf("can't close infile %s \n", infilename);exit(0);};
+  if (tmp != 0) 
+  {
+	  printf("can't close %s \n", infilename);
+	  exit(0);
+  }
 
-  /* --- sort the array ---------------------------------- */
   start = MPI_Wtime();
-  sort(data, localSize, psize);
-  startOutput = stop = MPI_Wtime();
+  sort(data, n, psize);
+  stop = MPI_Wtime();
 
-  /* ---- write array 'data' to outfile ------------------ */
   outfilepostfix[0] = 'o';
   outfilepostfix[1] = 'u';
   outfilepostfix[2] = 't';
@@ -323,23 +295,25 @@ int main(int argc,char *argv[])
   outfilepostfix[10] = 'x';
   outfilepostfix[11] = 't';
   outfilepostfix[12] = '\0';
+  
   strcat(outfilename, outfilepostfix);
   outfile = fopen(outfilename, "w");
-  fprintf(outfile,
-	  "--------- proc. %d: localSize = %d, sort time = %d sec.\n",
-	  myid, localSize, (stop - start));
-  for (i=0; i<localSize; i++) {buf = data[i]; fprintf(outfile,"%d \n", buf);};
-  stopTotal = MPI_Wtime();
-  fprintf(outfile,"--------- Total Time = %d sec.\n\n",
-	  (stopTotal - startTotal) );
-  tmp = fclose(outfile);
-  if (tmp != 0) {printf("can't close outfile %s \n", outfilename);exit(0);};
-
-  endOutput   = MPI_Wtime();
- // std::string sortChar = "sort";
- // printElapsed( sortChar,   myid, start,       stop );
- // printElapsed( "output", myid, startOutput, endOutput );
+  fprintf(outfile,"proc. %d: \n n = %d \n p = %d \n sort time = %d sec.\n", myid, n, psize,(stop - start));
   
+  for (i=0; i<n; i++) 
+  {
+	  buf = data[i];
+	  fprintf(outfile,"%d \n", buf);
+  }
+
+  tmp = fclose(outfile);
+  if (tmp != 0) 
+  {
+	  printf("can't close outfile %s \n", outfilename);
+	  exit(0);
+  }
+
+  printf("Proc. %d: Total Time = %d sec.\n", myid, (start - stop));
   MPI_Finalize();
 
 }

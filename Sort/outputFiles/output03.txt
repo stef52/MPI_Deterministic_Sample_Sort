@@ -1,5 +1,7 @@
---------- proc. 3: localSize = 2, sort time = 0 sec.
+proc. 3: 
+ localSize = 2 
+ sort time = 0 sec.
 3 
 3 
---------- Total Time = 0 sec.
+Total Time = 0 sec.
 
