@@ -1,5 +1,5 @@
-#output files
-outputFiles/*
+# output files
+outputFiles
 
 # Compiled Object files
 *.slo
