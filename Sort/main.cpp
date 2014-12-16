@@ -9,11 +9,11 @@
 #define InputFilePrefix "./inputFiles/"      //input file location 
 #define OutputFilePrefix "./outputFiles/"    //output file location
 #define MPI_Type  MPI_INT
-#define IsSmaller(x, y) ((x) < (y))
+#define IsSmaller(x, y) ((x) < (y)) 		//is smaller macros
 
-static void fix(int data[], register int m, register int n);
-void heapsort(int data[], int n);
-void sort(int data[], int localSize);
+static void fix(int data[], register int m, register int n); //readjust heap
+void heapsort(int data[], int n); // heap sort
+void sort(int data[], int localSize); //mpi sort
 
 int main(int argc,char *argv[])
 {
@@ -40,7 +40,7 @@ int main(int argc,char *argv[])
 	infilepostfix[3] = 'u';
 	infilepostfix[4] = 't';
 	infilepostfix[5] = '-';
-	infilepostfix[6] = ((myid % 100) / 10) + 48;
+	infilepostfix[6] = ((myid % 100) / 10) + 48;	//found this on google
 	infilepostfix[7] = (myid % 10) + 48;
 	infilepostfix[8] = '.';
 	infilepostfix[9] = 't';
@@ -115,7 +115,7 @@ int main(int argc,char *argv[])
 
 void sort(int data[], int n)
 {
-	int myid, prosCount, resultSize,i, j, buf, tmp, l, r, L, R;
+	int myid, prosCount, resultSize,i, j, tmp, l, r, Left, Right;
 	int *scounts, *displs, *sdispl, *recvtype, *bloc, *bsize, *counts, 
 	*send, *receive, *result, *sendBuf, *recvcounts;
 
@@ -210,21 +210,21 @@ void sort(int data[], int n)
 	MPI_Allgatherv(&resultSize, 1, MPI_INT, counts, displs, recvtype,
 		 MPI_INT, MPI_COMM_WORLD);
 
-	L=0;
+	Left=0;
 	for (i=0; i<myid; i++){
-		L += counts[i];
+		Left += counts[i];
 	}
-	R = L + counts[myid] - 1;
+	Right = Left + counts[myid] - 1;
 
 	for (i=0; i<prosCount; i++)
 	{
 		l = i * n;
 		r = ((i+1) * n) - 1;
 		send[i] = 0;
-      if ((L <= l) && (l <= R) && (R <= r)) send[i] = R-l+1;
-      if ((l <= L) && (L <= r) && (r <= R)) send[i] = r-L+1;
-      if ((l <= L) && (R <= r)) send[i] = R-L+1;
-      if ((L <= l) && (r <= R)) send[i] = r-l+1;
+      if ((Left <= l) && (l <= Right) && (Right <= r)) send[i] = Right-l+1;
+      if ((l <= Left) && (Left <= r) && (r <= Right)) send[i] = r-Left+1;
+      if ((l <= Left) && (Right <= r)) send[i] = Right-Left+1;
+      if ((Left <= l) && (r <= Right)) send[i] = r-l+1;
 	}
 
 	for (i=0; i<prosCount; i++)
