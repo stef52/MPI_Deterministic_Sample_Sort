@@ -1,0 +1,11 @@
+MPI_Deterministic_Sample_Sort
+=============================
+
+##Assignment 4 COMP 4009
+
+
+Write a parallel MPI program for p processors to sort n integers via the  Deterministic Sample Sort method discussed in class. For the local sequential array sort, use in-place Heapsort (array implementation of the heap). For communication, use only MPI_AllToAll or MPI_AllToAllv; no single message passing such as MPI_send.
+
+Each processor should read an input file of n/p integers in the following format. The input file for processor i should be named "input-i.txt" (input-00.txt, input-01, input-02, input-03, ...). Following the sort, each processor will output a file "output-i.txt" with its n/p integers of the result (one integer per line). As discussed in class, the input-xx.txt and output-xx.txt files should be on the local disk of the respective processor; not your home directory which is on a shared network attached disk. To get to a local disk, ssh to the respective processor, go to the "/tmp" directory, and create a temporary "/tmp/<your-name>". You can also use MPI to do the same. Note that the "/tmp" directories are public and shared among all users, and that they get cleared by the sys admin.
+Hand in your documented code and a test input/output for n=100 and p=4.
+Do a performance test of your method as shown HERE but with n=1,000,000 and 1 <= p <= 8. For each value of p, determine the computation time, communication time and total time as discussed in class (exclude file I/O from measured times). Hand in a table with your results and a performance graph similar to THIS. 
