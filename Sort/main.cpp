@@ -11,13 +11,8 @@
 #define MPI_Type  MPI_INT
 #define IsSmaller(x, y) ((x) < (y))
 
-int *MakeArray(int n)
-{
-	return((int *) malloc(n*sizeof(int)+1));
-}
-
-static void fix(int v[], register int m, register int n);
-void heapsort(int v[], int n);
+static void fix(int data[], register int m, register int n);
+void heapsort(int data[], int n);
 void sort(int data[], int localSize);
 
 int main(int argc,char *argv[])
@@ -65,7 +60,7 @@ int main(int argc,char *argv[])
 	fscanf(infile, "%d\n", &n);
 	fscanf(infile, "%d\n", &p);
 	n = n/p; //  n/p
-	data = MakeArray(n);
+	data = 	((int *) malloc(n*sizeof(int)+1));
 	 
 	for (i=0; i<n; i++) 
 	{
@@ -114,50 +109,8 @@ int main(int argc,char *argv[])
 	}
 	  
 	stopTotal = MPI_Wtime();
-	printf("Proc. %d: Total Time = %d sec.\n", myid, (startTotal - stopTotal));
+	printf("Proc. %d: Total Time = %d sec.\n", myid, (stopTotal - startTotal));
 	MPI_Finalize();
-}
-
-// sort into increasing order
-// heapsort logic from Stack Overflow
-// https://stackoverflow.com/questions/7520133/heap-sort-in-c
-void heapsort(int v[], int n)
-{
-	int j, temp;
-	int *b;
-	b = v - 1;
-	// put array into heap form
-	for (j = n/2; j > 0; j--)
-		fix(v, j, n);
-	for (j = n-1; j > 0; j--)
-	{
-	  temp = b[1];
-	  b[1]=b[j+1];
-	  b[j+1]=temp;
-	  fix(v, 1, j);
-	}
-}
-
-static void fix(int v[], int m, int n)
-{
-	int j, k, temp;
-	int *b;
-	//origin is 1
-	b = v - 1;  
-	j = m;
-	k = m * 2;
-	while (k <= n)
-	{
-		if (k < n && IsSmaller(b[k],b[k+1])) ++k;
-		if (IsSmaller(b[j],b[k]))
-		{
-			temp = b[j];
-			b[j]=b[k];
-			b[k]=temp;
-		}
-		j = k;
-		k *= 2;
-	}
 }
 
 void sort(int data[], int n)
@@ -169,18 +122,18 @@ void sort(int data[], int n)
 	MPI_Comm_size(MPI_COMM_WORLD, &prosCount);
 	MPI_Comm_rank(MPI_COMM_WORLD, &myid);
 
-	result      = MakeArray((2 * n));
-	sendBuf    	= MakeArray(prosCount);
-	recvcounts 	= MakeArray((prosCount * prosCount));
-	scounts     = (int *) malloc(prosCount*sizeof(int)+1);
-	displs      = (int *) malloc(prosCount*sizeof(int)+1);
-	sdispl      = (int *) malloc(prosCount*sizeof(int)+1);
-	recvtype    = (int *) malloc(prosCount*sizeof(int)+1);
-	counts      = (int *) malloc(prosCount*sizeof(int)+1);
-	send        = (int *) malloc(prosCount*sizeof(int)+1);
-	receive     = (int *) malloc(prosCount*sizeof(int)+1);
+	result      = (int *) malloc((2*n)*sizeof(int)+1);
+	sendBuf    	= (int *) malloc(prosCount*sizeof(int)+1);
+	recvcounts 	= (int *) malloc((prosCount * prosCount)*sizeof(int)+1);
 	bloc        = (int *) malloc(prosCount*sizeof(int)+1); 
 	bsize       = (int *) malloc(prosCount*sizeof(int)+1); 
+	counts      = (int *) malloc(prosCount*sizeof(int)+1);
+	displs      = (int *) malloc(prosCount*sizeof(int)+1);
+	receive     = (int *) malloc(prosCount*sizeof(int)+1);
+	recvtype    = (int *) malloc(prosCount*sizeof(int)+1);
+	scounts     = (int *) malloc(prosCount*sizeof(int)+1);
+	sdispl      = (int *) malloc(prosCount*sizeof(int)+1);
+	send        = (int *) malloc(prosCount*sizeof(int)+1);
 
 	heapsort(data, n);
 
@@ -296,18 +249,45 @@ void sort(int data[], int n)
 
 	MPI_Alltoallv(result, scounts, sdispl, MPI_Type, data, displs,
 		recvtype,  MPI_Type, MPI_COMM_WORLD);
+}
 
-//free all the tihngs
-	free(result);
-	free(sendBuf);
-	free(recvcounts);
-	free(scounts);
-	free(displs);
-	free(sdispl);
-	free(recvtype);
-	free(counts);
-	free(send);
-	free(receive);
-	free(bloc);
-	free(bsize);
+// sort into increasing order
+// heapsort logic from Stack Overflow
+// https://stackoverflow.com/questions/7520133/heap-sort-in-c
+void heapsort(int data[], int n)
+{
+	int *b;
+	b = data - 1;
+	// put array into heap form
+	for (int j = n/2; j > 0; j--)
+		fix(data, j, n);
+	for (int j = n-1; j > 0; j--)
+	{
+	    int temp = b[1];
+	    b[1]=b[j+1];
+	    b[j+1]=temp;
+	    fix(data, 1, j);
+	}
+}
+
+static void fix(int data[], int m, int n)
+{
+	int j, k;
+	int *b;
+	//origin is 1
+	b = data - 1;  
+	j = m;
+	k = m * 2;
+	while (k <= n)
+	{
+		if (k < n && IsSmaller(b[k],b[k+1])) ++k;
+		if (IsSmaller(b[j],b[k]))
+		{
+			int temp = b[j];
+			b[j]=b[k];
+			b[k]=temp;
+		}
+		j = k;
+		k *= 2;
+	}
 }
