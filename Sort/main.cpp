@@ -9,7 +9,6 @@
 #define InputFilePrefix "./inputFiles/"      //input file location 
 #define OutputFilePrefix "./outputFiles/"    //output file location
 #define MPI_Type  MPI_INT
-#define IsSmaller(x, y) ((x) < (y)) 		//is smaller macros
 
 static void fix(int data[], register int m, register int n); //readjust heap
 void heapsort(int data[], int n); // heap sort
@@ -112,6 +111,8 @@ int main(int argc,char *argv[])
 	printf("Proc. %d: Total Time = %d sec.\n", myid, (stopTotal - startTotal));
 	MPI_Finalize();
 }
+
+#define IsSmaller(x, y) ((x) < (y)) 		//is smaller macros
 
 void sort(int data[], int n)
 {
