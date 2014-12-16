@@ -1,15 +1,15 @@
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <time.h>
-#include <math.h>
 #include <string.h>
+#include <time.h>
 
 #include "mpi.h"
 
 #define InputFilePrefix "./inputFiles/"      //input file location 
 #define OutputFilePrefix "./outputFiles/"    //output file location
 #define MPI_Type  MPI_INT
-#define Smaller(x, y) ((x) < (y))
+#define IsSmaller(x, y) ((x) < (y))
 
 int *MakeArray(int n)
 {
@@ -27,9 +27,9 @@ int main(int argc,char *argv[])
 	char infilepostfix[7], outfilepostfix[8];
 	char infilename[100] = InputFilePrefix;
 	char outfilename[100] = OutputFilePrefix;
-	int *data;    // input data 
-	int n;     		  	// input size 
-	int p;     			// input proc 
+	int *data;	// input data 
+	int n;     	// input size 
+	int p;     	// input proc 
 
 	int buf, tmp, i, startTotal, stopTotal;
 
@@ -148,8 +148,8 @@ static void fix(int v[], int m, int n)
 	k = m * 2;
 	while (k <= n)
 	{
-		if (k < n && Smaller(b[k],b[k+1])) ++k;
-		if (Smaller(b[j],b[k]))
+		if (k < n && IsSmaller(b[k],b[k+1])) ++k;
+		if (IsSmaller(b[j],b[k]))
 		{
 			temp = b[j];
 			b[j]=b[k];
@@ -208,7 +208,7 @@ void sort(int data[], int n)
 	bloc[0] = 0;
 	for (i=1; i<prosCount; i++)
     {
-		while (Smaller(data[j],sendBuf[i])) {
+		while (IsSmaller(data[j],sendBuf[i])) {
 			j++;
 		}
 		bloc[i]=j;
