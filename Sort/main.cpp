@@ -15,8 +15,111 @@
 
 ArrayData *MakeArray(int n)
 {
-   return((ArrayData *) malloc(n*sizeof(ArrayData)+1));
+	return((ArrayData *) malloc(n*sizeof(ArrayData)+1));
 };
+
+static void adjust(ArrayData v[], register int m, register int n);
+void heapsort(ArrayData v[], int n);
+void sort(ArrayData data[], int localSize);
+
+int main(int argc,char *argv[])
+{
+	int myid, prosCount;
+	FILE *infile, *outfile;
+	char infilepostfix[7], outfilepostfix[8];
+	char infilename[100] = InputFilePrefix;
+	char outfilename[100] = OutputFilePrefix;
+	ArrayData *data;    // input data 
+	int n;     // input size 
+	int psize;     	// input proc 
+
+  int buf, tmp, i, startTotal, stopTotal;
+
+  MPI_Init(&argc, &argv);
+
+  startTotal = MPI_Wtime();
+  MPI_Comm_size(MPI_COMM_WORLD, &prosCount);
+  MPI_Comm_rank(MPI_COMM_WORLD, &myid);
+
+  infilepostfix[0] = 'i';
+  infilepostfix[1] = 'n';
+  infilepostfix[2] = 'p';
+  infilepostfix[3] = 'u';
+  infilepostfix[4] = 't';
+  infilepostfix[5] = '-';
+  infilepostfix[6] = ((myid % 100) / 10) + 48;
+  infilepostfix[7] = (myid % 10) + 48;
+  infilepostfix[8] = '.';
+  infilepostfix[9] = 't';
+  infilepostfix[10] = 'x';
+  infilepostfix[11] = 't';
+  infilepostfix[12] = '\0';
+  
+  strcat(infilename, infilepostfix);
+  infile = fopen(infilename, "r");
+  
+  if (infile == NULL) 
+  {
+	  printf("can't open infile(s) \n");
+	  exit(0);
+  }
+  
+  fscanf(infile, "%d\n", &n);
+  fscanf(infile, "%d\n", &psize);
+  n = n/psize; //  n/p
+  data = MakeArray(n);
+  
+  for (i=0; i<n; i++) 
+  {
+	  fscanf(infile, "%d", &buf); 
+	  data[i]=buf;
+  }
+  
+  tmp = fclose(infile);
+  if (tmp != 0) 
+  {
+	  printf("can't close %s \n", infilename);
+	  exit(0);
+  }
+
+  sort(data, n);
+
+  outfilepostfix[0] = 'o';
+  outfilepostfix[1] = 'u';
+  outfilepostfix[2] = 't';
+  outfilepostfix[3] = 'p';
+  outfilepostfix[4] = 'u';
+  outfilepostfix[5] = 't';
+  outfilepostfix[6] = ((myid % 100) / 10) + 48;
+  outfilepostfix[7] = (myid % 10) + 48;
+  outfilepostfix[8] = '.';
+  outfilepostfix[9] = 't';
+  outfilepostfix[10] = 'x';
+  outfilepostfix[11] = 't';
+  outfilepostfix[12] = '\0';
+  
+  strcat(outfilename, outfilepostfix);
+  outfile = fopen(outfilename, "w");
+  fprintf(outfile,"proc. %d: \n n = %d \n p = %d \n ", myid, n, psize);
+  
+  for (i=0; i<n; i++) 
+  {
+	  buf = data[i];
+	  fprintf(outfile,"%d \n", buf);
+  }
+
+  tmp = fclose(outfile);
+  if (tmp != 0) 
+  {
+	  printf("can't close outfile %s \n", outfilename);
+	  exit(0);
+  }
+  stopTotal = MPI_Wtime();
+  printf("Proc. %d: Total Time = %d sec.\n", myid, (startTotal - stopTotal));
+  MPI_Finalize();
+
+}
+
 
 static void adjust(ArrayData v[], register int m, register int n)
 {
@@ -51,9 +154,9 @@ void heapsort(ArrayData v[], int n)
 	}
 }
 
-void sort(ArrayData data[], int n, int prosCount)
+void sort(ArrayData data[], int n)
 {
-  int myid;
+  int myid, prosCount;
   ArrayData *result;               
   int resultSize;               
   ArrayData *splitters, *allSplitters;
@@ -215,105 +318,3 @@ void sort(ArrayData data[], int n, int prosCount)
   free(bsize);
 
 };
-
-int main(int argc,char *argv[])
-{
-  int myid, prosCount;
-  FILE *infile, *outfile;
-  char infilepostfix[7], outfilepostfix[8];
-  char infilename[100] = InputFilePrefix;
-  char outfilename[100] = OutputFilePrefix;
-  ArrayData *data;    // input data 
-  int n;     // input size 
-  int psize;     	// input proc 
-
-  int buf, tmp, i, 
-      start, stop, startTotal, stopTotal,
-      localelapsedTime, globalelapsedTime;
-
-  MPI_Init(&argc, &argv);
-
-  startTotal = MPI_Wtime();
-  MPI_Comm_size(MPI_COMM_WORLD, &prosCount);
-  MPI_Comm_rank(MPI_COMM_WORLD, &myid);
-
-  infilepostfix[0] = 'i';
-  infilepostfix[1] = 'n';
-  infilepostfix[2] = 'p';
-  infilepostfix[3] = 'u';
-  infilepostfix[4] = 't';
-  infilepostfix[5] = '-';
-  infilepostfix[6] = ((myid % 100) / 10) + 48;
-  infilepostfix[7] = (myid % 10) + 48;
-  infilepostfix[8] = '.';
-  infilepostfix[9] = 't';
-  infilepostfix[10] = 'x';
-  infilepostfix[11] = 't';
-  infilepostfix[12] = '\0';
-  
-  strcat(infilename, infilepostfix);
-  infile = fopen(infilename, "r");
-  
-  if (infile == NULL) 
-  {
-	  printf("can't open infile(s) \n");
-	  exit(0);
-  }
-  
-  fscanf(infile, "%d\n", &n);
-  fscanf(infile, "%d\n", &psize);
-  n = n/psize; //  n/p
-  data = MakeArray(n);
-  
-  for (i=0; i<n; i++) 
-  {
-	  fscanf(infile, "%d", &buf); 
-	  data[i]=buf;
-  }
-  
-  tmp = fclose(infile);
-  if (tmp != 0) 
-  {
-	  printf("can't close %s \n", infilename);
-	  exit(0);
-  }
-
-  start = MPI_Wtime();
-  sort(data, n, psize);
-  stop = MPI_Wtime();
-
-  outfilepostfix[0] = 'o';
-  outfilepostfix[1] = 'u';
-  outfilepostfix[2] = 't';
-  outfilepostfix[3] = 'p';
-  outfilepostfix[4] = 'u';
-  outfilepostfix[5] = 't';
-  outfilepostfix[6] = ((myid % 100) / 10) + 48;
-  outfilepostfix[7] = (myid % 10) + 48;
-  outfilepostfix[8] = '.';
-  outfilepostfix[9] = 't';
-  outfilepostfix[10] = 'x';
-  outfilepostfix[11] = 't';
-  outfilepostfix[12] = '\0';
-  
-  strcat(outfilename, outfilepostfix);
-  outfile = fopen(outfilename, "w");
-  fprintf(outfile,"proc. %d: \n n = %d \n p = %d \n sort time = %d sec.\n", myid, n, psize,(stop - start));
-  
-  for (i=0; i<n; i++) 
-  {
-	  buf = data[i];
-	  fprintf(outfile,"%d \n", buf);
-  }
-
-  tmp = fclose(outfile);
-  if (tmp != 0) 
-  {
-	  printf("can't close outfile %s \n", outfilename);
-	  exit(0);
-  }
-
-  printf("Proc. %d: Total Time = %d sec.\n", myid, (start - stop));
-  MPI_Finalize();
-
-}

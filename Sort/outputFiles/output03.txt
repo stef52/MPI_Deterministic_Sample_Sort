@@ -1,7 +1,5 @@
 proc. 3: 
- localSize = 2 
- sort time = 0 sec.
+ n = 2 
+ p = 3 
+ 3 
 3 
-3 
-Total Time = 0 sec.
-
