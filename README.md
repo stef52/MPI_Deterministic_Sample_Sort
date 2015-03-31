@@ -1,7 +1,7 @@
 MPI_Deterministic_Sample_Sort
 =============================
 
-##Assignment 4 COMP 4009
+##Assignment 4 
 
 
 Write a parallel MPI program for p processors to sort n integers via the  Deterministic Sample Sort method discussed in class. For the local sequential array sort, use in-place Heapsort (array implementation of the heap). For communication, use only MPI_AllToAll or MPI_AllToAllv; no single message passing such as MPI_send.
